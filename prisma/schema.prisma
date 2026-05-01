@@ -1,32 +1,730 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// ============================================================================
+// KOWA RIDE - SUPERADMIN DASHBOARD
+// Prisma Schema (PostgreSQL / Supabase)
+// ============================================================================
+//
+// This schema defines the complete database model for the Kowa Ride
+// ride-hailing fleet management platform.
+//
+// Database: PostgreSQL (Supabase)
+// Auth: Supabase Auth (separate from this schema)
+//
+// @version 2.0.0
+// @author Kowa Ride Engineering Team
+// ============================================================================
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  FLEET_MANAGER
+  FLEET_OWNER
+  RIDER
+  COMPLIANCE_OFFICER
+}
+
+enum KycStatus {
+  PENDING
+  IN_REVIEW
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum RiderStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_ONBOARDING
+  TERMINATED
+}
+
+enum PerformanceTier {
+  PLATINUM
+  GOLD
+  SILVER
+  BRONZE
+  PROBATION
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AssetStatus {
+  ACTIVE
+  IDLE
+  IN_MAINTENANCE
+  DECOMMISSIONED
+  REPORTED_STOLEN
+  TOTAL_LOSS
+}
+
+enum TransactionType {
+  DAILY_PAYMENT
+  OWNER_PAYOUT
+  MANAGER_FEE
+  MAINTENANCE_ALLOCATION
+  HMO_PREMIUM
+  COMPANY_REVENUE
+  RESERVE_FUND
+  PENALTY
+  BONUS
+  REFUND
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REVERSED
+  FLAGGED
+}
+
+enum PaymentStatus {
+  PAID
+  PARTIALLY_PAID
+  PENDING
+  OVER_DUE
+}
+
+enum UnpaidDayAction {
+  NONE
+  SMS_WARNING
+  FM_CALL
+  FINAL_WARNING
+  SUSPENDED
+  BIKE_RETRIEVAL
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+enum AlertEntityType {
+  RIDER
+  FLEET_MANAGER
+  FLEET_OWNER
+  ASSET
+  SYSTEM
+  FINANCIAL
+}
+
+enum RiskEntityType {
+  RIDER
+  FLEET_MANAGER
+  FLEET_OWNER
+}
+
+enum AuditCategory {
+  AUTH
+  FINANCIAL
+  USER_MGMT
+  CONFIG
+  ENFORCEMENT
+  OPERATIONS
+  SYSTEM
+}
+
+enum ExpenseCategory {
+  MAINTENANCE
+  FUEL
+  SALARY
+  OFFICE
+  INSURANCE
+  EQUIPMENT
+  LOGISTICS
+  HMO
+  UTILITIES
+  MISCELLANEOUS
+}
+
+enum PayoutRecipientType {
+  FLEET_OWNER
+  FLEET_MANAGER
+  HMO
+  STAFF
+}
+
+enum PayoutApprovalStatus {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+enum ConfigType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+enum ConfigCategory {
+  FINANCIAL
+  OPERATIONS
+  COMPLIANCE
+  NOTIFICATION
+  SECURITY
+}
+
+// ============================================================================
+// USER & AUTHENTICATION
+// ============================================================================
+
+/// Base user model shared across all user roles in the Kowa Ride ecosystem.
+/// Role-specific data is stored in separate profile tables.
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String    @id @default(cuid())
+  email        String    @unique
+  firstName    String    @map("first_name")
+  lastName     String    @map("last_name")
+  phone        String
+  avatarUrl    String?   @map("avatar_url")
+  role         UserRole
+  kycStatus    KycStatus @default(PENDING) @map("kyc_status")
+  passwordHash String?   @map("password_hash")
+  lastActiveAt DateTime  @default(now()) @map("last_active_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  rider        Rider?
+  fleetManager FleetManager?
+  fleetOwner   FleetOwner?
+  auditLogs    AuditLogEntry[]
+
+  @@map("users")
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ============================================================================
+// RIDER PROFILE
+// ============================================================================
+
+/// Rider-specific profile extending the base User.
+model Rider {
+  id                      String          @id @default(cuid())
+  userId                  String          @unique @map("user_id")
+  riderId                 String          @unique @map("rider_id")
+  fleetManagerId          String          @map("fleet_manager_id")
+  dailyPaymentAmount      Decimal         @default(0) @map("daily_payment_amount") @db.Decimal(12, 2)
+  totalPaidToDate         Decimal         @default(0) @map("total_paid_to_date") @db.Decimal(15, 2)
+  paymentStreak           Int             @default(0) @map("payment_streak")
+  repaymentRate           Decimal         @default(0) @db.Decimal(5, 2)
+  hmoEnrolled             Boolean         @default(false) @map("hmo_enrolled")
+  ownershipProgressMonths Int             @default(0) @map("ownership_progress_months")
+  lastKnownLatitude       Decimal?        @map("last_known_latitude") @db.Decimal(9, 6)
+  lastKnownLongitude      Decimal?        @map("last_known_longitude") @db.Decimal(9, 6)
+  lastGpsPingAt           DateTime?       @map("last_gps_ping_at")
+  accountBalance          Decimal         @default(0) @db.Decimal(12, 2)
+  unpaidDays              Int             @default(0) @map("unpaid_days")
+  unpaidDayAction         UnpaidDayAction @default(NONE) @map("unpaid_day_action")
+  status                  RiderStatus     @default(PENDING_ONBOARDING)
+  createdAt               DateTime        @default(now()) @map("created_at")
+  updatedAt               DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fleetManager  FleetManager   @relation(fields: [fleetManagerId], references: [id])
+  assignedBike  BikeAsset?     @relation("RiderAssignedBike")
+  dailyPayments DailyPayment[]
+
+  @@index([fleetManagerId])
+  @@index([status])
+  @@index([riderId])
+  @@map("riders")
+}
+
+// ============================================================================
+// FLEET MANAGER PROFILE
+// ============================================================================
+
+/// Fleet Manager profile with performance metrics and portfolio data.
+model FleetManager {
+  id                     String          @id @default(cuid())
+  userId                 String          @unique @map("user_id")
+  managerId              String          @unique @map("manager_id")
+  tier                   PerformanceTier @default(BRONZE)
+  performanceScore       Int             @default(0) @map("performance_score")
+  totalBikesAssigned     Int             @default(0) @map("total_bikes_assigned")
+  activeRiders           Int             @default(0) @map("active_riders")
+  portfolioRepaymentRate Decimal         @default(0) @map("portfolio_repayment_rate") @db.Decimal(5, 2)
+  utilizationRate        Decimal         @default(0) @map("utilization_rate") @db.Decimal(5, 2)
+  incidentCount30d       Int             @default(0) @map("incident_count_30d")
+  monthlyFee             Decimal         @default(0) @db.Decimal(12, 2)
+  fleetOwnerId           String          @map("fleet_owner_id")
+  createdAt              DateTime        @default(now()) @map("created_at")
+  updatedAt              DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fleetOwner   FleetOwner     @relation(fields: [fleetOwnerId], references: [id])
+  riders       Rider[]
+  bikes        BikeAsset[]
+
+  @@index([fleetOwnerId])
+  @@index([tier])
+  @@map("fleet_managers")
+}
+
+// ============================================================================
+// FLEET OWNER PROFILE
+// ============================================================================
+
+/// Fleet Owner profile with asset portfolio and ROI tracking.
+model FleetOwner {
+  id                   String   @id @default(cuid())
+  userId               String   @unique @map("user_id")
+  ownerId              String   @unique @map("owner_id")
+  totalBikes           Int      @default(0) @map("total_bikes")
+  activeBikes          Int      @default(0) @map("active_bikes")
+  totalRoi             Decimal  @default(0) @map("total_roi") @db.Decimal(5, 2)
+  monthlyRoi           Decimal  @default(0) @map("monthly_roi") @db.Decimal(5, 2)
+  pendingPayout        Decimal  @default(0) @map("pending_payout") @db.Decimal(15, 2)
+  totalEarnings        Decimal  @default(0) @map("total_earnings") @db.Decimal(15, 2)
+  avgActiveDaysPerWeek Decimal  @default(0) @map("avg_active_days_per_week") @db.Decimal(3, 1)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankDetail    OwnerBankDetail?
+  fleetManagers FleetManager[]
+  bikes         BikeAsset[]
+  payouts       PayoutSummary[]
+
+  @@index([ownerId])
+  @@map("fleet_owners")
+}
+
+/// Bank account details for fleet owner payout processing.
+model OwnerBankDetail {
+  id            String   @id @default(cuid())
+  fleetOwnerId  String   @unique @map("fleet_owner_id")
+  bankName      String   @map("bank_name")
+  accountNumber String   @map("account_number")
+  accountName   String   @map("account_name")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  fleetOwner FleetOwner @relation(fields: [fleetOwnerId], references: [id], onDelete: Cascade)
+
+  @@map("owner_bank_details")
+}
+
+// ============================================================================
+// BIKE ASSETS / FLEET
+// ============================================================================
+
+/// Bike asset record with GPS tracking, maintenance scheduling, and lifecycle management.
+model BikeAsset {
+  id                  String      @id @default(cuid())
+  assetId             String      @unique @map("asset_id")
+  makeModel           String      @map("make_model")
+  year                Int
+  color               String
+  plateNumber         String      @unique @map("plate_number")
+  vinNumber           String      @unique @map("vin_number")
+  status              AssetStatus @default(ACTIVE)
+  assignedRiderId     String?     @unique @map("assigned_rider_id")
+  fleetManagerId      String      @map("fleet_manager_id")
+  fleetOwnerId        String      @map("fleet_owner_id")
+  registeredAt        DateTime    @default(now()) @map("registered_at")
+  currentValue        Decimal     @default(0) @map("current_value") @db.Decimal(12, 2)
+  purchasePrice       Decimal     @default(0) @map("purchase_price") @db.Decimal(12, 2)
+  odometerKm          Int         @default(0) @map("odometer_km")
+  lastGpsLatitude     Decimal?    @map("last_gps_latitude") @db.Decimal(9, 6)
+  lastGpsLongitude    Decimal?    @map("last_gps_longitude") @db.Decimal(9, 6)
+  lastGpsSpeed        Decimal?    @map("last_gps_speed") @db.Decimal(6, 1)
+  lastGpsPingAt       DateTime?   @map("last_gps_ping_at")
+  maintenanceCount    Int         @default(0) @map("maintenance_count")
+  lastMaintenanceDate DateTime?   @map("last_maintenance_date")
+  nextMaintenanceDate DateTime?   @map("next_maintenance_date")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  assignedRider       Rider?               @relation("RiderAssignedBike", fields: [assignedRiderId], references: [id])
+  fleetManager        FleetManager         @relation(fields: [fleetManagerId], references: [id])
+  fleetOwner          FleetOwner           @relation(fields: [fleetOwnerId], references: [id])
+  maintenanceRecords  BikeMaintenanceRecord[]
+  alerts              SystemAlert[]
+
+  @@index([status])
+  @@index([fleetManagerId])
+  @@index([fleetOwnerId])
+  @@map("bike_assets")
+}
+
+/// Maintenance record for each bike service event.
+model BikeMaintenanceRecord {
+  id          String   @id @default(cuid())
+  bikeId      String   @map("bike_id")
+  description String
+  cost        Decimal  @db.Decimal(12, 2)
+  vendorName  String   @map("vendor_name")
+  performedAt DateTime @map("performed_at")
+  nextDueDate DateTime? @map("next_due_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  bike BikeAsset @relation(fields: [bikeId], references: [id], onDelete: Cascade)
+
+  @@index([bikeId])
+  @@map("bike_maintenance_records")
+}
+
+// ============================================================================
+// FINANCIAL - TRANSACTIONS
+// ============================================================================
+
+/// Financial transaction record for the double-entry ledger.
+model Transaction {
+  id          String            @id @default(cuid())
+  reference   String            @unique
+  type        TransactionType
+  status      TransactionStatus @default(PENDING)
+  amount      Decimal           @db.Decimal(15, 2)
+  description String
+  initiatedBy String            @map("initiated_by")
+  receivedBy  String            @map("received_by")
+  completedAt DateTime?         @map("completed_at")
+  metadata    Json?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  dailyPayments DailyPayment[]
+
+  @@index([type])
+  @@index([status])
+  @@index([initiatedBy])
+  @@index([receivedBy])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+// ============================================================================
+// FINANCIAL - DAILY PAYMENTS
+// ============================================================================
+
+/// Individual rider daily payment tracking record.
+model DailyPayment {
+  id             String        @id @default(cuid())
+  riderId        String        @map("rider_id")
+  amount         Decimal       @db.Decimal(12, 2)
+  expectedAmount Decimal       @map("expected_amount") @db.Decimal(12, 2)
+  status         PaymentStatus @default(PENDING)
+  paidAt         DateTime?     @map("paid_at")
+  dueDate        DateTime      @map("due_date")
+  transactionId  String?       @map("transaction_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  rider       Rider        @relation(fields: [riderId], references: [id])
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([riderId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("daily_payments")
+}
+
+// ============================================================================
+// FINANCIAL - PAYOUT SUMMARIES
+// ============================================================================
+
+/// Weekly/periodic payout summary for fleet owners.
+model PayoutSummary {
+  id           String            @id @default(cuid())
+  fleetOwnerId String            @map("fleet_owner_id")
+  ownerName    String            @map("owner_name")
+  amount       Decimal           @db.Decimal(15, 2)
+  activeDays   Int               @map("active_days")
+  periodStart  DateTime          @map("period_start")
+  periodEnd    DateTime          @map("period_end")
+  status       TransactionStatus @default(PENDING)
+  processedAt  DateTime?         @map("processed_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  fleetOwner FleetOwner @relation(fields: [fleetOwnerId], references: [id])
+
+  @@index([fleetOwnerId])
+  @@index([status])
+  @@map("payout_summaries")
+}
+
+// ============================================================================
+// FINANCIAL - EXPENSES
+// ============================================================================
+
+/// Operational expense record for tracking platform costs.
+model Expense {
+  id          String            @id @default(cuid())
+  reference   String            @unique
+  category    ExpenseCategory
+  description String
+  amount      Decimal           @db.Decimal(15, 2)
+  status      TransactionStatus @default(PENDING)
+  payee       String
+  approvedBy  String?           @map("approved_by")
+  date        DateTime
+  receiptUrl  String?           @map("receipt_url")
+  notes       String?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([status])
+  @@index([date])
+  @@map("expenses")
+}
+
+// ============================================================================
+// FINANCIAL - PAYOUT RECORDS
+// ============================================================================
+
+/// Detailed payout record for tracking disbursements to all recipient types.
+model PayoutRecord {
+  id             String               @id @default(cuid())
+  reference      String               @unique
+  recipientType  PayoutRecipientType  @map("recipient_type")
+  recipientName  String               @map("recipient_name")
+  recipientId    String               @map("recipient_id")
+  amount         Decimal              @db.Decimal(15, 2)
+  status         TransactionStatus    @default(PENDING)
+  period         String
+  bankDetails    String               @map("bank_details")
+  processedAt    DateTime?            @map("processed_at")
+  approvalStatus PayoutApprovalStatus @default(PENDING) @map("approval_status")
+  approvedBy     String?              @map("approved_by")
+  notes          String?
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  @@index([recipientType])
+  @@index([recipientId])
+  @@index([approvalStatus])
+  @@map("payout_records")
+}
+
+// ============================================================================
+// RISK & COMPLIANCE - SYSTEM ALERTS
+// ============================================================================
+
+/// System alert generated by the risk engine or manual admin action.
+model SystemAlert {
+  id                String        @id @default(cuid())
+  severity          AlertSeverity
+  title             String
+  description       String
+  entityType        AlertEntityType @map("entity_type")
+  entityId          String        @map("entity_id")
+  isAcknowledged    Boolean       @default(false) @map("is_acknowledged")
+  acknowledgedBy    String?       @map("acknowledged_by")
+  acknowledgedAt    DateTime?     @map("acknowledged_at")
+  isResolved        Boolean       @default(false) @map("is_resolved")
+  resolvedBy        String?       @map("resolved_by")
+  resolvedAt        DateTime?     @map("resolved_at")
+  recommendedAction String?       @map("recommended_action")
+  bikeId            String?       @map("bike_id")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  bike BikeAsset? @relation(fields: [bikeId], references: [id])
+
+  @@index([severity])
+  @@index([entityType])
+  @@index([isAcknowledged])
+  @@index([isResolved])
+  @@index([createdAt])
+  @@map("system_alerts")
+}
+
+// ============================================================================
+// RISK & COMPLIANCE - RISK ASSESSMENTS
+// ============================================================================
+
+/// Risk assessment for a user or entity with factor breakdown.
+/// Uses polymorphic entityId/entityType pattern rather than multiple FK relations.
+model RiskAssessment {
+  id         String         @id @default(cuid())
+  entityId   String         @map("entity_id")
+  entityType RiskEntityType @map("entity_type")
+  riskLevel  RiskLevel      @map("risk_level")
+  riskScore  Int
+  assessedAt DateTime       @default(now()) @map("assessed_at")
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  // Relations
+  factors RiskFactor[]
+
+  @@index([entityType])
+  @@index([riskLevel])
+  @@index([assessedAt])
+  @@map("risk_assessments")
+}
+
+/// Individual risk factor contributing to an overall risk assessment.
+model RiskFactor {
+  id           String   @id @default(cuid())
+  assessmentId String   @map("assessment_id")
+  name         String
+  score        Int
+  value        String
+  isAcceptable Boolean  @default(false) @map("is_acceptable")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  assessment RiskAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@map("risk_factors")
+}
+
+// ============================================================================
+// AUDIT LOG
+// ============================================================================
+
+/// Immutable audit log entry for compliance tracking with hash chaining.
+model AuditLogEntry {
+  id                String       @id @default(cuid())
+  actorId           String       @map("actor_id")
+  actorName         String       @map("actor_name")
+  actorRole         UserRole
+  action            String
+  category          AuditCategory
+  targetEntity      String       @map("target_entity")
+  targetId          String       @map("target_id")
+  details           String
+  ipAddress         String       @map("ip_address")
+  previousEntryHash String       @map("previous_entry_hash")
+  entryHash         String       @unique @map("entry_hash")
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  user User? @relation(fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([category])
+  @@index([targetEntity])
+  @@index([targetId])
+  @@index([createdAt])
+  @@map("audit_log_entries")
+}
+
+// ============================================================================
+// SYSTEM CONFIGURATION
+// ============================================================================
+
+/// System configuration parameter (key-value store with metadata).
+model SystemConfig {
+  id             String        @id @default(cuid())
+  key            String        @unique
+  label          String
+  description    String
+  value          String
+  type           ConfigType
+  category       ConfigCategory
+  isEditable     Boolean       @default(true) @map("is_editable")
+  lastModifiedAt DateTime      @default(now()) @map("last_modified_at")
+  lastModifiedBy String        @map("last_modified_by")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([key])
+  @@map("system_configs")
+}
+
+// ============================================================================
+// PLATFORM KPIs (Cached/Snapshot)
+// ============================================================================
+
+/// Cached platform-wide KPI snapshot, updated periodically.
+model PlatformKPISnapshot {
+  id                       String   @id @default(cuid())
+  totalRiders              Int      @map("total_riders")
+  activeRiders             Int      @map("active_riders")
+  totalFleetManagers       Int      @map("total_fleet_managers")
+  totalFleetOwners         Int      @map("total_fleet_owners")
+  totalBikes               Int      @map("total_bikes")
+  activeBikes              Int      @map("active_bikes")
+  fleetUtilizationRate     Decimal  @map("fleet_utilization_rate") @db.Decimal(5, 2)
+  avgRepaymentRate         Decimal  @map("avg_repayment_rate") @db.Decimal(5, 2)
+  todayRevenue             Decimal  @map("today_revenue") @db.Decimal(15, 2)
+  monthlyRevenue           Decimal  @map("monthly_revenue") @db.Decimal(15, 2)
+  totalOutstandingPayments Decimal  @map("total_outstanding_payments") @db.Decimal(15, 2)
+  unresolvedAlerts         Int      @map("unresolved_alerts")
+  criticalRiskItems        Int      @map("critical_risk_items")
+  pendingPayouts           Decimal  @map("pending_payouts") @db.Decimal(15, 2)
+  snapshotDate             DateTime @map("snapshot_date")
+  createdAt                DateTime @default(now()) @map("created_at")
+
+  @@index([snapshotDate])
+  @@map("platform_kpi_snapshots")
+}
+
+// ============================================================================
+// CHART DATA (Historical Analytics)
+// ============================================================================
+
+/// Pre-computed chart data points for dashboard analytics.
+model ChartDataPoint {
+  id             String   @id @default(cuid())
+  chartType      String   @map("chart_type")
+  label          String
+  value          Decimal  @db.Decimal(15, 2)
+  secondaryValue Decimal? @map("secondary_value") @db.Decimal(15, 2)
+  period         String
+  recordedAt     DateTime @map("recorded_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([chartType])
+  @@index([period])
+  @@index([recordedAt])
+  @@map("chart_data_points")
+}
+
+// ============================================================================
+// ACTIVITY FEED
+// ============================================================================
+
+/// Recent activity items for the dashboard activity feed.
+model ActivityItem {
+  id                String   @id @default(cuid())
+  type              String
+  title             String
+  description       String
+  requiresAttention Boolean  @default(false) @map("requires_attention")
+  timestamp         DateTime
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@index([type])
+  @@index([timestamp])
+  @@index([requiresAttention])
+  @@map("activity_items")
 }
