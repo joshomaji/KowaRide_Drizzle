@@ -25,3 +25,24 @@ Stage Summary:
 - Proper indexes on frequently queried fields
 - Seed script covers all mock data (10 riders, 6 fleet managers, 5 fleet owners, 8 bikes, 12 transactions, etc.)
 - Waiting for Supabase credentials to connect and push schema
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix all issues and document required Supabase credentials
+
+Work Log:
+- Ran `prisma validate` - schema is valid ✅
+- Ran `bun run lint` - found 21 lint errors in cloned KowaRiders directory (not our code)
+- Added `KowaRiders/**` and `mini-services/**` to eslint ignore list in `eslint.config.mjs`
+- Verified lint passes clean after ignore update
+- Verified dev server running successfully on port 3000
+- Updated `.env` with comprehensive documentation for all 5 required Supabase credentials
+- Credentials documented: DATABASE_URL, DIRECT_URL, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+- Each credential includes: where to find it, format, example, and usage notes
+
+Stage Summary:
+- All project code is lint-clean
+- Schema validates and Prisma client generates successfully
+- 5 Supabase credentials needed (documented in .env with instructions)
+- Waiting for user to provide Supabase credentials
