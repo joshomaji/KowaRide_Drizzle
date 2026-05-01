@@ -1,24 +1,23 @@
 /**
  * ============================================================================
  * KOWA RIDE - SUPERADMIN DASHBOARD
- * Drizzle ORM — Database Client
+ * Drizzle ORM — Database Client (node-postgres)
  * ============================================================================
  *
- * PostgreSQL connection via the `postgres` driver with Drizzle ORM.
- * Uses pooled connection for queries and direct connection for migrations.
+ * PostgreSQL connection via the `pg` driver with Drizzle ORM.
+ * Uses pooled connection for queries (port 6543 via PgBouncer).
  *
- * The connection is lazily initialized — if DATABASE_URL is not set or is
- * still a placeholder, queries will throw a clear error. This allows the
- * dashboard to run with mock data until real Supabase credentials are provided.
- *
- * IMPORTANT: All heavy imports (postgres, drizzle-orm, schema) are done
- * dynamically only when a valid DATABASE_URL is detected. This prevents
- * the postgres driver from initiating any connection at module load time.
+ * Uses node-postgres (pg) instead of postgres.js for better compatibility
+ * with Next.js Turbopack runtime.
  *
  * @module db
- * @version 3.3.0 (Drizzle ORM — fully lazy, async-safe)
+ * @version 5.0.0 (Drizzle ORM — node-postgres driver)
  * ============================================================================
  */
+
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import * as schema from "@/db/schema";
 
 // ─── Connection Validation ──────────────────────────────────────────────────
 
@@ -26,49 +25,58 @@ const PLACEHOLDER_INDICATORS = ["[PROJECT_REF]", "[YOUR_DB_PASSWORD]", "YOUR_DB_
 
 function isValidDatabaseUrl(url: string | undefined): url is string {
   if (!url) return false;
-  return !PLACEHOLDER_INDICATORS.some((indicator) => url.includes(indicator));
+  if (PLACEHOLDER_INDICATORS.some((indicator) => url.includes(indicator))) return false;
+  // Reject SQLite file: URLs (stale env var from old Prisma setup)
+  if (url.startsWith("file:")) return false;
+  return true;
 }
-
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-type DrizzleInstance = ReturnType<typeof import("drizzle-orm/postgres-js").drizzle>;
-type PostgresClient = ReturnType<typeof import("postgres").default>;
 
 // ─── Lazy Singleton ─────────────────────────────────────────────────────────
 
-let _queryClient: PostgresClient | null = null;
-let _db: DrizzleInstance | null = null;
-let _initPromise: Promise<DrizzleInstance | null> | null = null;
+let _pool: Pool | null = null;
+let _db: ReturnType<typeof drizzle> | null = null;
+let _initPromise: Promise<ReturnType<typeof drizzle> | null> | null = null;
 
-async function createClient(): Promise<{ client: PostgresClient; db: DrizzleInstance } | null> {
-  if (!isValidDatabaseUrl(process.env.DATABASE_URL)) {
+async function createClient(): Promise<{ pool: Pool; db: ReturnType<typeof drizzle> } | null> {
+  const url = process.env.DATABASE_URL;
+  if (!isValidDatabaseUrl(url)) {
+    console.warn("[DB] No valid DATABASE_URL found — running without database.");
     return null;
   }
 
-  // Dynamic imports — only loaded when we have a valid DATABASE_URL
-  const { drizzle } = await import("drizzle-orm/postgres-js");
-  const postgres = (await import("postgres")).default;
-  const schema = await import("@/db/schema");
+  console.log("[DB] Creating PostgreSQL connection pool (node-postgres)...");
 
-  const client = postgres(process.env.DATABASE_URL, {
-    prepare: false,
+  const pool = new Pool({
+    connectionString: url,
     max: 10,
-    idle_timeout: 20,
-    connect_timeout: 15,
+    idleTimeoutMillis: 20000,
+    connectionTimeoutMillis: 30000,
+    ssl: {
+      rejectUnauthorized: false,
+    },
   });
 
-  return { client, db: drizzle(client, { schema }) };
+  // Quick connectivity test
+  try {
+    const client = await pool.connect();
+    await client.query("SELECT 1 as health_check");
+    client.release();
+    console.log("[DB] ✅ Database connection established successfully.");
+  } catch (err: any) {
+    console.error("[DB] ❌ Database health check failed:", err?.message || err);
+  }
+
+  const db = drizzle(pool, { schema });
+
+  return { pool, db };
 }
 
 /**
  * Initialize the database connection asynchronously.
  * Call this once at app startup (or in API routes) when DATABASE_URL is valid.
  * Returns the drizzle instance if successful, or null if URL is placeholder.
- *
- * This is the ONLY way to get a working db instance.
- * The `db` Proxy export will auto-initialize on first use.
  */
-export async function initDb(): Promise<DrizzleInstance | null> {
+export async function initDb(): Promise<ReturnType<typeof drizzle> | null> {
   if (_db) return _db;
 
   // Prevent concurrent initialization
@@ -78,7 +86,7 @@ export async function initDb(): Promise<DrizzleInstance | null> {
     const result = await createClient();
     if (!result) return null;
 
-    _queryClient = result.client;
+    _pool = result.pool;
     _db = result.db;
     return _db;
   })();
@@ -108,11 +116,9 @@ export function isDbConnected(): boolean {
  * const users = await db.select().from(usersTable);
  * ```
  */
-export const db = new Proxy({} as DrizzleInstance, {
+export const db = new Proxy({} as ReturnType<typeof drizzle>, {
   get(_target, prop, _receiver) {
-    // Synchronous access — auto-initialize and throw helpful error if not ready
     if (!_db) {
-      // Trigger async init in background
       initDb().catch(() => {});
       throw new Error(
         "Database not yet initialized. Use `const db = await initDb()` in async contexts, " +
@@ -126,27 +132,3 @@ export const db = new Proxy({} as DrizzleInstance, {
     return value;
   },
 });
-
-/**
- * Direct postgres client for admin operations (migrations, DDL).
- * Uses DIRECT_URL (port 5432) which bypasses PgBouncer.
- */
-export async function getDirectClient() {
-  const directUrl = process.env.DIRECT_URL;
-  if (!directUrl || PLACEHOLDER_INDICATORS.some((i) => directUrl.includes(i))) {
-    throw new Error(
-      "DIRECT_URL environment variable is required for admin operations. " +
-      "Set a valid direct connection string in .env."
-    );
-  }
-
-  const { drizzle } = await import("drizzle-orm/postgres-js");
-  const postgres = (await import("postgres")).default;
-  const schema = await import("@/db/schema");
-
-  const directClient = postgres(directUrl, {
-    max: 1,
-    prepare: true,
-  });
-  return drizzle(directClient, { schema });
-}

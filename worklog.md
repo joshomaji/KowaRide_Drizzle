@@ -70,3 +70,29 @@ Stage Summary:
 - 20 database tables live in Supabase PostgreSQL
 - Dashboard protected behind authentication
 - Code pushed to GitHub repository
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Fix login failure — "Failed query: select from users" ECONNREFUSED error
+
+Work Log:
+- Diagnosed login failure: NextAuth authorize() was getting ECONNREFUSED from postgres.js driver
+- Discovered ROOT CAUSE: Stale `DATABASE_URL=file:/home/z/my-project/db/custom.db` (SQLite) set in system environment was overriding the .env file's PostgreSQL URL
+- Next.js prioritizes system env vars over .env files, so the Supabase connection string was never being used
+- Additionally, the postgres.js driver had compatibility issues with Next.js Turbopack runtime (ECONNREFUSED even with correct URL)
+- Migrated from postgres.js to node-postgres (pg) driver for better Turbopack compatibility
+- Updated src/lib/db.ts: replaced postgres.js with pg Pool, added `file:` URL rejection in isValidDatabaseUrl()
+- Updated drizzle.config.ts: added stale env var detection
+- Updated package.json dev script: `unset DATABASE_URL 2>/dev/null; next dev -p 3000`
+- Updated next.config.ts: serverExternalPackages changed from postgres to pg
+- Added robust error handling in auth config (catch ECONNREFUSED, prevent SQL leak)
+- Verified login works: admin@kowaride.com / KowaR1d3@2024! returns 302 with session token
+- Verified session data includes all user fields (role, kycStatus, firstName, etc.)
+- Lint passes clean
+
+Stage Summary:
+- Login authentication fully working with Supabase PostgreSQL
+- Root cause was stale DATABASE_URL in system env + postgres.js incompatibility with Turbopack
+- Switched to node-postgres (pg) driver — more stable in Next.js runtime
+- Admin login: admin@kowaride.com / KowaR1d3@2024!
