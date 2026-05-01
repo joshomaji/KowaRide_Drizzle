@@ -1,33 +1,65 @@
 /**
  * ============================================================================
  * KOWA RIDE - SUPERADMIN DASHBOARD
- * Prisma Database Client
+ * Drizzle ORM — Database Client
  * ============================================================================
  *
- * Singleton Prisma client configured for Supabase PostgreSQL.
- * Uses the global pattern to prevent multiple client instances during
- * hot module reloading in development.
+ * PostgreSQL connection via the `postgres` driver with Drizzle ORM.
+ * Uses pooled connection for queries and direct connection for migrations.
  *
- * Connection details:
- * - DATABASE_URL: Pooled connection via PgBouncer (port 6543) for runtime queries
- * - DIRECT_URL: Direct connection (port 5432) for Prisma Migrate operations
- *
- * @module lib/db
- * @version 2.0.0
+ * @module db
+ * @version 3.0.0 (Drizzle ORM)
  * ============================================================================
  */
 
-import { PrismaClient } from '@prisma/client'
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema";
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
+// ─── Connection Setup ────────────────────────────────────────────────────────
 
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-    datasourceUrl: process.env.DATABASE_URL,
-  })
+const connectionString = process.env.DATABASE_URL!;
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
+/**
+ * Pooled postgres client for runtime queries.
+ * In Supabase, this uses PgBouncer (port 6543) for connection pooling.
+ */
+const queryClient = postgres(connectionString, {
+  // Prepare mode works with PgBouncer transaction mode
+  prepare: false,
+  // Connection pool settings
+  max: 10,
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
+
+/**
+ * Drizzle ORM database instance with full schema awareness.
+ *
+ * Usage:
+ * ```typescript
+ * import { db } from "@/lib/db";
+ * import { users } from "@/db/schema";
+ * import { eq } from "drizzle-orm";
+ *
+ * const allUsers = await db.select().from(users);
+ * const user = await db.select().from(users).where(eq(users.email, "admin@kowa.ng"));
+ * ```
+ */
+export const db = drizzle(queryClient, { schema });
+
+/**
+ * Direct postgres client for admin operations (migrations, DDL).
+ * Uses DIRECT_URL (port 5432) which bypasses PgBouncer.
+ */
+export const getDirectClient = () => {
+  const directUrl = process.env.DIRECT_URL;
+  if (!directUrl) {
+    throw new Error("DIRECT_URL environment variable is required for admin operations");
+  }
+  const directClient = postgres(directUrl, {
+    max: 1,
+    prepare: true,
+  });
+  return drizzle(directClient, { schema });
+};
