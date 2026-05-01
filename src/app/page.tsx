@@ -1,38 +1,32 @@
 /**
  * ============================================================================
  * KOWA RIDE - SUPERADMIN DASHBOARD
- * Main Entry Point (Single Page Application)
+ * Main Entry Point (Single Page Application with Auth)
  * ============================================================================
  *
- * This is the root page of the Superadmin dashboard. It renders the
- * AdminLayout shell (sidebar + header) and conditionally displays
- * the active section based on Zustand store state.
+ * This is the root page of the Superadmin dashboard. It checks authentication
+ * status and shows either the Login page or the Dashboard.
  *
  * Navigation is handled entirely client-side via the AdminSection enum
  * stored in the admin Zustand store.
  *
- * Architecture Note:
- * In production, each section would be a lazy-loaded route via Next.js
- * dynamic imports. For this implementation, all sections are rendered
- * conditionally within a single page component.
- *
  * @module app/page
- * @version 1.0.0
- * @author Kowa Ride Engineering Team
+ * @version 2.0.0 (with authentication)
  * ============================================================================
  */
 
 "use client";
 
+import { useSession } from "next-auth/react";
 import { AdminLayout } from "@/components/admin/layout/admin-layout";
 import { useAdminStore } from "@/store/admin-store";
 import { AdminSection } from "@/types/admin";
+import LoginPage from "@/components/auth/login-page";
+import { Loader2 } from "lucide-react";
 
 // ============================================================================
 // SECTION COMPONENTS
 // ============================================================================
-// Each page section is a self-contained module that handles its own
-// data fetching (from mock data) and rendering logic.
 
 import { DashboardOverview } from "@/components/admin/dashboard/overview";
 import { RidersPage } from "@/components/admin/users/riders-page";
@@ -49,9 +43,6 @@ import { SettingsPage } from "@/components/admin/settings/settings-page";
 // ============================================================================
 // SECTION RENDERER MAP
 // ============================================================================
-// Maps each AdminSection enum value to its corresponding React component.
-// This pattern enables clean, maintainable section switching without
-// long conditional chains.
 
 const sectionComponents: Record<AdminSection, React.ComponentType> = {
   [AdminSection.OVERVIEW]: DashboardOverview,
@@ -73,29 +64,31 @@ const sectionComponents: Record<AdminSection, React.ComponentType> = {
 // ============================================================================
 
 export default function HomePage() {
-  /** Read the active section from global Zustand store */
+  const { data: session, status } = useSession();
   const activeSection = useAdminStore((state) => state.activeSection);
 
-  /**
-   * Resolve the component to render for the current section.
-   * Falls back to DashboardOverview if section is somehow invalid.
-   */
+  // Show loading spinner while checking session
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+          <p className="text-slate-400 text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (status === "unauthenticated" || !session) {
+    return <LoginPage />;
+  }
+
+  // Show dashboard for authenticated users
   const ActiveSectionComponent = sectionComponents[activeSection] || DashboardOverview;
 
   return (
-    /**
-     * AdminLayout provides:
-     * - Collapsible sidebar navigation (desktop)
-     * - Mobile sidebar overlay
-     * - Fixed top header bar
-     * - Scrollable content area
-     */
     <AdminLayout>
-      {/*
-        Key prop ensures React remounts the section component
-        when the active section changes, triggering entrance
-        animations and resetting local state.
-      */}
       <div key={activeSection} className="p-4 md:p-6">
         <ActiveSectionComponent />
       </div>

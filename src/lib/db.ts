@@ -8,16 +8,15 @@
  * Uses pooled connection for queries and direct connection for migrations.
  *
  * The connection is lazily initialized — if DATABASE_URL is not set or is
- * still a placeholder, the db object will still be exported but queries
- * will throw a clear error. This allows the dashboard to run with mock
- * data during development until real Supabase credentials are provided.
+ * still a placeholder, queries will throw a clear error. This allows the
+ * dashboard to run with mock data until real Supabase credentials are provided.
  *
  * IMPORTANT: All heavy imports (postgres, drizzle-orm, schema) are done
  * dynamically only when a valid DATABASE_URL is detected. This prevents
  * the postgres driver from initiating any connection at module load time.
  *
  * @module db
- * @version 3.2.0 (Drizzle ORM — fully lazy, no eager imports)
+ * @version 3.3.0 (Drizzle ORM — fully lazy, async-safe)
  * ============================================================================
  */
 
@@ -32,15 +31,16 @@ function isValidDatabaseUrl(url: string | undefined): url is string {
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type DrizzleInstance = Awaited<ReturnType<typeof import("drizzle-orm/postgres-js").drizzle>>;
+type DrizzleInstance = ReturnType<typeof import("drizzle-orm/postgres-js").drizzle>;
 type PostgresClient = ReturnType<typeof import("postgres").default>;
 
 // ─── Lazy Singleton ─────────────────────────────────────────────────────────
 
 let _queryClient: PostgresClient | null = null;
 let _db: DrizzleInstance | null = null;
+let _initPromise: Promise<DrizzleInstance | null> | null = null;
 
-async function createClient() {
+async function createClient(): Promise<{ client: PostgresClient; db: DrizzleInstance } | null> {
   if (!isValidDatabaseUrl(process.env.DATABASE_URL)) {
     return null;
   }
@@ -54,42 +54,37 @@ async function createClient() {
     prepare: false,
     max: 10,
     idle_timeout: 20,
-    connect_timeout: 10,
+    connect_timeout: 15,
   });
 
   return { client, db: drizzle(client, { schema }) };
 }
 
 /**
- * Drizzle ORM database instance with full schema awareness.
+ * Initialize the database connection asynchronously.
+ * Call this once at app startup (or in API routes) when DATABASE_URL is valid.
+ * Returns the drizzle instance if successful, or null if URL is placeholder.
  *
- * Lazily creates the PostgreSQL connection on first property access.
- * Throws a clear error if DATABASE_URL is not configured (placeholder in .env).
- *
- * Usage:
- * ```typescript
- * import { db } from "@/lib/db";
- * import { users } from "@/db/schema";
- * import { eq } from "drizzle-orm";
- *
- * const allUsers = await db.select().from(users);
- * ```
+ * This is the ONLY way to get a working db instance.
+ * The `db` Proxy export will auto-initialize on first use.
  */
-export const db = new Proxy({} as DrizzleInstance, {
-  get(_target, prop, receiver) {
-    if (!_db) {
-      const result = createClient();
-      // Since createClient is async but Proxy.get must be sync,
-      // we throw a helpful error directing the user to configure the DB.
-      throw new Error(
-        "Database not configured. Set a valid DATABASE_URL in .env " +
-        "(remove placeholder values and add your Supabase connection string). " +
-        "Until then, the app runs with mock data."
-      );
-    }
-    return Reflect.get(_db, prop, receiver);
-  },
-});
+export async function initDb(): Promise<DrizzleInstance | null> {
+  if (_db) return _db;
+
+  // Prevent concurrent initialization
+  if (_initPromise) return _initPromise;
+
+  _initPromise = (async () => {
+    const result = await createClient();
+    if (!result) return null;
+
+    _queryClient = result.client;
+    _db = result.db;
+    return _db;
+  })();
+
+  return _initPromise;
+}
 
 /**
  * Check if the database connection is available.
@@ -100,20 +95,37 @@ export function isDbConnected(): boolean {
 }
 
 /**
- * Initialize the database connection asynchronously.
- * Call this once at app startup (or in API routes) when DATABASE_URL is valid.
- * Returns the drizzle instance if successful, or null if URL is placeholder.
+ * Drizzle ORM database instance.
+ *
+ * Uses a Proxy to lazily initialize the connection on first method call.
+ * On first access, it calls initDb() to establish the connection.
+ *
+ * Usage in API routes (recommended):
+ * ```typescript
+ * import { initDb } from "@/lib/db";
+ * const db = await initDb();
+ * if (!db) { /* handle no DB *\/ }
+ * const users = await db.select().from(usersTable);
+ * ```
  */
-export async function initDb(): Promise<DrizzleInstance | null> {
-  if (_db) return _db;
-
-  const result = await createClient();
-  if (!result) return null;
-
-  _queryClient = result.client;
-  _db = result.db;
-  return _db;
-}
+export const db = new Proxy({} as DrizzleInstance, {
+  get(_target, prop, _receiver) {
+    // Synchronous access — auto-initialize and throw helpful error if not ready
+    if (!_db) {
+      // Trigger async init in background
+      initDb().catch(() => {});
+      throw new Error(
+        "Database not yet initialized. Use `const db = await initDb()` in async contexts, " +
+        "or check isDbConnected() before accessing db."
+      );
+    }
+    const value = (_db as any)[prop];
+    if (typeof value === "function") {
+      return value.bind(_db);
+    }
+    return value;
+  },
+});
 
 /**
  * Direct postgres client for admin operations (migrations, DDL).

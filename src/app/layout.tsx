@@ -8,8 +8,7 @@
  * for the entire Kowa Ride Superadmin application.
  *
  * @module app/layout
- * @version 2.0.0
- * @author Kowa Ride Engineering Team
+ * @version 3.0.0 (with authentication)
  * ============================================================================
  */
 
@@ -18,6 +17,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "next-themes";
+import { AuthProvider } from "@/lib/auth/provider";
 
 // ============================================================================
 // FONT CONFIGURATION
@@ -76,8 +76,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <Toaster />
+          <AuthProvider>
+            {children}
+            <Toaster />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

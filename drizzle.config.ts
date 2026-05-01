@@ -4,14 +4,12 @@
  * Drizzle Kit Configuration
  * ============================================================================
  *
- * Configuration for `drizzle-kit` CLI commands:
- *   - drizzle-kit generate   → Generate SQL migration files
- *   - drizzle-kit push       → Push schema directly to database
- *   - drizzle-kit studio     → Open Drizzle Studio (DB GUI)
- *   - drizzle-kit migrate    → Run pending migrations
+ * Uses the pooled connection (port 6543) since direct connections
+ * (port 5432) may not be available in all environments.
+ * Drizzle Kit push works fine with PgBouncer in transaction mode.
  *
  * @module drizzle.config
- * @version 3.0.0 (Drizzle ORM)
+ * @version 3.1.0 (Drizzle ORM)
  * ============================================================================
  */
 

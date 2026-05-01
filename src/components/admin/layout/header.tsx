@@ -25,6 +25,7 @@ import {
   Sun,
   Moon,
 } from "lucide-react";
+import { signOut, useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -48,7 +49,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertSeverity } from "@/types/admin";
+import { AlertSeverity, AdminSection } from "@/types/admin";
 import { format } from "date-fns";
 
 // ============================================================================
@@ -122,6 +123,7 @@ const severityDots: Record<AlertSeverity, string> = {
 // ============================================================================
 
 export function AdminHeader() {
+  const { data: session } = useSession();
   const {
     activeSection,
     mobileSidebarOpen,
@@ -316,12 +318,12 @@ export function AdminHeader() {
               >
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-gradient-to-br from-emerald-400 to-emerald-600 text-xs font-bold text-white">
-                    SA
+                    {session?.user?.firstName?.[0] || "S"}{session?.user?.lastName?.[0] || "A"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden text-left md:block">
-                  <p className="text-sm font-medium text-foreground">Super Admin</p>
-                  <p className="text-[10px] text-muted-foreground">Kowamart & Logistics</p>
+                  <p className="text-sm font-medium text-foreground">{session?.user?.firstName || "Super"} {session?.user?.lastName || "Admin"}</p>
+                  <p className="text-[10px] text-muted-foreground">{session?.user?.email || "admin@kowaride.com"}</p>
                 </div>
                 <ChevronDown className="hidden h-3.5 w-3.5 text-muted-foreground md:block" />
               </Button>
@@ -329,8 +331,9 @@ export function AdminHeader() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col gap-1">
-                  <p className="text-sm font-medium">Super Admin</p>
-                  <p className="text-xs text-slate-500">admin@kowamart.com</p>
+                  <p className="text-sm font-medium">{session?.user?.firstName || "Super"} {session?.user?.lastName || "Admin"}</p>
+                  <p className="text-xs text-slate-500">{session?.user?.email || "admin@kowaride.com"}</p>
+                  <p className="text-[10px] text-emerald-500 font-medium">{session?.user?.role || "SUPER_ADMIN"}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -338,12 +341,15 @@ export function AdminHeader() {
                 <User className="mr-2 h-4 w-4" />
                 Profile Settings
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => useAdminStore.getState().setActiveSection(AdminSection.SETTINGS)}>
                 <Settings className="mr-2 h-4 w-4" />
                 System Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600 focus:text-red-600">
+              <DropdownMenuItem
+                className="text-red-600 focus:text-red-600"
+                onClick={() => signOut({ callbackUrl: "/" })}
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign Out
               </DropdownMenuItem>
