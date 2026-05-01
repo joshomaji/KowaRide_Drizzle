@@ -69,14 +69,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`
-          ${inter.variable}
-          ${jetbrainsMono.variable}
-          antialiased
-          font-[family-name:var(--font-inter)]
-        `}
-      >
+      <body className={`${inter.variable} ${jetbrainsMono.variable} antialiased font-[family-name:var(--font-inter)]`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
