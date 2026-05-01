@@ -76,3 +76,24 @@ Stage Summary:
   - src/db/seed.ts ready for initial data seeding
 - Project builds and runs cleanly with no errors
 - Awaiting Supabase credentials to push schema and seed database
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Fix preview window not working (dev server crashing)
+
+Work Log:
+- Diagnosed that src/lib/db.ts was eagerly creating PostgreSQL connection with placeholder DATABASE_URL
+- The `postgres` driver tried to connect to invalid host and crashed the entire Next.js process
+- Rewrote src/lib/db.ts to use lazy Proxy-based connection initialization
+- Added isValidDatabaseUrl() check that detects placeholder values like [PROJECT_REF], [YOUR_DB_PASSWORD]
+- Added isDbConnected() helper for conditional mock vs real data switching
+- Database queries now throw a clear error if URL is placeholder, instead of crashing the process
+- Also fixed dev script: removed `| tee dev.log` pipe that was causing SIGTERM in bun
+- Server now starts and remains stable with consistent 200 responses
+
+Stage Summary:
+- Root cause: eager postgres connection at module import time with placeholder URL
+- Fix: lazy Proxy-based db client that only connects when first query is made
+- Preview window now works — dashboard renders correctly
+- Server stable across multiple requests with no crashes
