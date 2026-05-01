@@ -1,39 +1,66 @@
+/**
+ * ============================================================================
+ * KOWA RIDE - SUPERADMIN DASHBOARD
+ * Root Layout Configuration
+ * ============================================================================
+ *
+ * Provides the global HTML structure, fonts, metadata, and shared providers
+ * for the entire Kowa Ride Superadmin application.
+ *
+ * @module app/layout
+ * @version 2.0.0
+ * @author Kowa Ride Engineering Team
+ * ============================================================================
+ */
+
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "next-themes";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// ============================================================================
+// FONT CONFIGURATION
+// ============================================================================
+
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
+  display: "swap",
 });
+
+// ============================================================================
+// METADATA
+// ============================================================================
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "Kowa Ride | Superadmin Dashboard",
+  description:
+    "Enterprise administration console for Kowa Ride — A subsidiary of Kowamart and Logistics Ltd. Manage riders, fleet operations, financial allocations, risk, and compliance.",
+  keywords: [
+    "Kowa Ride",
+    "Superadmin",
+    "Dashboard",
+    "Ride-hailing",
+    "Fleet Management",
+    "Kowamart",
+    "Logistics",
+  ],
+  authors: [{ name: "Kowa Ride Engineering Team" }],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
-  openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-  },
 };
+
+// ============================================================================
+// ROOT LAYOUT
+// ============================================================================
 
 export default function RootLayout({
   children,
@@ -43,10 +70,22 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`
+          ${inter.variable}
+          ${jetbrainsMono.variable}
+          antialiased
+          font-[family-name:var(--font-inter)]
+        `}
       >
-        {children}
-        <Toaster />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );
