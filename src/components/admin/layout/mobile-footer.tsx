@@ -62,19 +62,19 @@ const ROLE_MOBILE_NAV: Record<string, MobileNavItem[]> = {
   ],
   [UserRole.FLEET_MANAGER]: [
     { id: AdminSection.OVERVIEW, label: "Dashboard", icon: LayoutDashboard },
-    { id: AdminSection.RIDERS, label: "My Riders", icon: Users },
-    { id: AdminSection.FINANCIALS, label: "Payments", icon: Wallet },
-    { id: AdminSection.FLEET, label: "Bikes", icon: Gauge },
+    { id: AdminSection.FM_MY_RIDERS, label: "My Riders", icon: Users },
+    { id: AdminSection.FM_FINANCIALS, label: "Payments", icon: Wallet },
+    { id: AdminSection.FM_FLEET, label: "Bikes", icon: Gauge },
   ],
   [UserRole.FLEET_OWNER]: [
     { id: AdminSection.OVERVIEW, label: "Dashboard", icon: LayoutDashboard },
-    { id: AdminSection.FLEET, label: "My Fleet", icon: Bike },
-    { id: AdminSection.FINANCIALS, label: "Payouts", icon: Crown },
+    { id: AdminSection.FO_MY_FLEET, label: "My Fleet", icon: Bike },
+    { id: AdminSection.FO_PAYOUTS, label: "Payouts", icon: Crown },
   ],
   [UserRole.RIDER]: [
     { id: AdminSection.OVERVIEW, label: "Dashboard", icon: LayoutDashboard },
-    { id: AdminSection.FINANCIALS, label: "Payments", icon: CreditCard },
-    { id: AdminSection.FLEET, label: "My Bike", icon: Bike },
+    { id: AdminSection.R_MY_PAYMENTS, label: "Payments", icon: CreditCard },
+    { id: AdminSection.R_MY_BIKE, label: "My Bike", icon: Bike },
   ],
 };
 

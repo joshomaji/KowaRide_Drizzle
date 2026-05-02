@@ -126,6 +126,7 @@ export enum AlertSeverity {
 
 /** Navigation sections for the admin sidebar */
 export enum AdminSection {
+  // ── Shared sections ──────────────────────────────────────────────────────
   OVERVIEW = "OVERVIEW",
   RIDERS = "RIDERS",
   FLEET_MANAGERS = "FLEET_MANAGERS",
@@ -139,6 +140,20 @@ export enum AdminSection {
   EXPENSES = "EXPENSES",
   SETTINGS = "SETTINGS",
   PROFILE = "PROFILE",
+
+  // ── Fleet Manager specific sections ──────────────────────────────────────
+  FM_MY_RIDERS = "FM_MY_RIDERS",
+  FM_FLEET = "FM_FLEET",
+  FM_FINANCIALS = "FM_FINANCIALS",
+  FM_RISK = "FM_RISK",
+
+  // ── Fleet Owner specific sections ────────────────────────────────────────
+  FO_MY_FLEET = "FO_MY_FLEET",
+  FO_PAYOUTS = "FO_PAYOUTS",
+
+  // ── Rider specific sections ──────────────────────────────────────────────
+  R_MY_PAYMENTS = "R_MY_PAYMENTS",
+  R_MY_BIKE = "R_MY_BIKE",
 }
 
 // ============================================================================

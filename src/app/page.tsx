@@ -12,7 +12,7 @@
  * stored in the Zustand admin store.
  *
  * @module app/page
- * @version 3.0.0 (role-based dashboards)
+ * @version 4.0.0 (separate role-specific dashboards)
  * ============================================================================
  */
 
@@ -26,7 +26,7 @@ import LoginPage from "@/components/auth/login-page";
 import { Loader2 } from "lucide-react";
 
 // ============================================================================
-// SHARED SECTION COMPONENTS
+// SHARED SECTION COMPONENTS (Super Admin / Admin)
 // ============================================================================
 
 import { DashboardOverview } from "@/components/admin/dashboard/overview";
@@ -51,6 +51,29 @@ import { FleetOwnerOverview } from "@/components/fleet-owner/dashboard/overview"
 import { RiderOverview } from "@/components/rider/dashboard/overview";
 
 // ============================================================================
+// FLEET MANAGER SPECIFIC PAGES
+// ============================================================================
+
+import { FMMyRiders } from "@/components/fleet-manager/my-riders";
+import { FMMyFleet } from "@/components/fleet-manager/my-fleet";
+import { FMFinancialOverview } from "@/components/fleet-manager/financial-overview";
+import { FMRiskCompliance } from "@/components/fleet-manager/risk-compliance";
+
+// ============================================================================
+// FLEET OWNER SPECIFIC PAGES
+// ============================================================================
+
+import { MyFleet as FOMyFleet } from "@/components/fleet-owner/my-fleet";
+import { Payouts as FOPayouts } from "@/components/fleet-owner/payouts";
+
+// ============================================================================
+// RIDER SPECIFIC PAGES
+// ============================================================================
+
+import { MyPayments } from "@/components/rider/my-payments";
+import { MyBike } from "@/components/rider/my-bike";
+
+// ============================================================================
 // ROLE-SPECIFIC OVERVIEW MAP (defined at module level, not during render)
 // ============================================================================
 
@@ -63,10 +86,11 @@ const roleOverviewMap: Record<string, React.ComponentType> = {
 };
 
 // ============================================================================
-// SHARED SECTION COMPONENTS MAP
+// FULL SECTION COMPONENT MAP
 // ============================================================================
 
 const sectionComponents: Record<AdminSection, React.ComponentType> = {
+  // ── Shared sections (Super Admin / Admin) ──────────────────────────────
   [AdminSection.OVERVIEW]: DashboardOverview, // fallback, overridden by role
   [AdminSection.RIDERS]: RidersPage,
   [AdminSection.FLEET_MANAGERS]: FleetManagersPage,
@@ -80,6 +104,20 @@ const sectionComponents: Record<AdminSection, React.ComponentType> = {
   [AdminSection.AUDIT]: AuditPage,
   [AdminSection.SETTINGS]: SettingsPage,
   [AdminSection.PROFILE]: ProfilePage,
+
+  // ── Fleet Manager specific sections ────────────────────────────────────
+  [AdminSection.FM_MY_RIDERS]: FMMyRiders,
+  [AdminSection.FM_FLEET]: FMMyFleet,
+  [AdminSection.FM_FINANCIALS]: FMFinancialOverview,
+  [AdminSection.FM_RISK]: FMRiskCompliance,
+
+  // ── Fleet Owner specific sections ──────────────────────────────────────
+  [AdminSection.FO_MY_FLEET]: FOMyFleet,
+  [AdminSection.FO_PAYOUTS]: FOPayouts,
+
+  // ── Rider specific sections ────────────────────────────────────────────
+  [AdminSection.R_MY_PAYMENTS]: MyPayments,
+  [AdminSection.R_MY_BIKE]: MyBike,
 };
 
 // ============================================================================
@@ -94,7 +132,7 @@ function SectionRenderer({ activeSection, userRole }: { activeSection: AdminSect
     return <RoleOverview />;
   }
 
-  // For other sections, use the shared section component
+  // For other sections, use the section component map
   const SectionComponent = sectionComponents[activeSection] || DashboardOverview;
   return <SectionComponent />;
 }

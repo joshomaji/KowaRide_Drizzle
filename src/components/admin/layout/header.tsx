@@ -102,6 +102,41 @@ const sectionMeta: Record<string, { title: string; description: string }> = {
     title: "My Profile",
     description: "Manage your personal information and security settings",
   },
+  // ── Fleet Manager sections ──────────────────────────────────────────────
+  FM_MY_RIDERS: {
+    title: "My Riders",
+    description: "Manage and monitor riders under your supervision",
+  },
+  FM_FLEET: {
+    title: "Fleet & Assets",
+    description: "Bikes and assets under your management",
+  },
+  FM_FINANCIALS: {
+    title: "Financial Overview",
+    description: "Collection performance and payment tracking",
+  },
+  FM_RISK: {
+    title: "Risk & Compliance",
+    description: "Rider risk alerts and compliance monitoring",
+  },
+  // ── Fleet Owner sections ────────────────────────────────────────────────
+  FO_MY_FLEET: {
+    title: "My Fleet",
+    description: "Your bike portfolio and investment tracking",
+  },
+  FO_PAYOUTS: {
+    title: "Payouts & Earnings",
+    description: "Payment history, earnings trends, and bank details",
+  },
+  // ── Rider sections ──────────────────────────────────────────────────────
+  R_MY_PAYMENTS: {
+    title: "My Payments",
+    description: "Payment history, status, and ownership progress",
+  },
+  R_MY_BIKE: {
+    title: "My Bike",
+    description: "Bike details, maintenance, and ownership journey",
+  },
 };
 
 /** Role-specific OVERVIEW titles and descriptions */

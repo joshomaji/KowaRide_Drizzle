@@ -137,20 +137,20 @@ const ROLE_NAV_GROUPS: Record<string, NavGroup[]> = {
     {
       label: "Fleet",
       items: [
-        { id: AdminSection.RIDERS, label: "My Riders", icon: Bike },
-        { id: AdminSection.FLEET, label: "Fleet & Assets", icon: Bike },
+        { id: AdminSection.FM_MY_RIDERS, label: "My Riders", icon: Users },
+        { id: AdminSection.FM_FLEET, label: "Fleet & Assets", icon: Bike },
       ],
     },
     {
       label: "Finance",
       items: [
-        { id: AdminSection.FINANCIALS, label: "Financial Overview", icon: Wallet },
+        { id: AdminSection.FM_FINANCIALS, label: "Financial Overview", icon: Wallet },
       ],
     },
     {
       label: "Governance",
       items: [
-        { id: AdminSection.RISK, label: "Risk & Compliance", icon: ShieldAlert },
+        { id: AdminSection.FM_RISK, label: "Risk & Compliance", icon: ShieldAlert },
       ],
     },
     {
@@ -171,13 +171,13 @@ const ROLE_NAV_GROUPS: Record<string, NavGroup[]> = {
     {
       label: "Fleet",
       items: [
-        { id: AdminSection.FLEET, label: "My Fleet", icon: Bike },
+        { id: AdminSection.FO_MY_FLEET, label: "My Fleet", icon: Bike },
       ],
     },
     {
       label: "Finance",
       items: [
-        { id: AdminSection.FINANCIALS, label: "Financial/Payouts", icon: Wallet },
+        { id: AdminSection.FO_PAYOUTS, label: "Payouts & Earnings", icon: Wallet },
       ],
     },
     {
@@ -198,13 +198,13 @@ const ROLE_NAV_GROUPS: Record<string, NavGroup[]> = {
     {
       label: "Finance",
       items: [
-        { id: AdminSection.FINANCIALS, label: "My Payments", icon: CreditCard },
+        { id: AdminSection.R_MY_PAYMENTS, label: "My Payments", icon: CreditCard },
       ],
     },
     {
       label: "Assets",
       items: [
-        { id: AdminSection.FLEET, label: "My Bike", icon: Bike },
+        { id: AdminSection.R_MY_BIKE, label: "My Bike", icon: Bike },
       ],
     },
     {
