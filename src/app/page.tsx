@@ -39,6 +39,7 @@ import { FleetPage } from "@/components/admin/fleet/fleet-page";
 import { RiskPage } from "@/components/admin/risk/risk-page";
 import { AuditPage } from "@/components/admin/audit/audit-page";
 import { SettingsPage } from "@/components/admin/settings/settings-page";
+import { ProfilePage } from "@/components/admin/settings/profile-page";
 
 // ============================================================================
 // SECTION RENDERER MAP
@@ -57,6 +58,7 @@ const sectionComponents: Record<AdminSection, React.ComponentType> = {
   [AdminSection.RISK]: RiskPage,
   [AdminSection.AUDIT]: AuditPage,
   [AdminSection.SETTINGS]: SettingsPage,
+  [AdminSection.PROFILE]: ProfilePage,
 };
 
 // ============================================================================

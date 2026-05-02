@@ -4,16 +4,18 @@
  * Sidebar Navigation Component
  * ============================================================================
  *
- * Responsive sidebar navigation with collapsible support, active state tracking,
- * section grouping, and badge indicators for alerts/notifications.
+ * Responsive sidebar navigation with role-based visibility, collapsible support,
+ * active state tracking, section grouping, and badge indicators.
  *
  * Features:
+ * - Role-based navigation items per user role (SUPER_ADMIN, FLEET_MANAGER, etc.)
  * - Collapsible to icon-only mode on desktop
  * - Slide-over overlay on mobile devices
  * - Section grouping with visual separators
  * - Notification badges on alert-heavy sections
  * - Smooth animations via Framer Motion
  * - Keyboard accessible navigation
+ * - Working sign-out with redirect fix for reverse proxy
  *
  * @module components/admin/layout/sidebar
  * ============================================================================
@@ -21,6 +23,9 @@
 
 "use client";
 
+import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -37,13 +42,14 @@ import {
   ChevronRight,
   LogOut,
   Bell,
-  AlertTriangle,
   X,
   Receipt,
+  UserCircle,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminStore } from "@/store/admin-store";
-import { AdminSection } from "@/types/admin";
+import { AdminSection, UserRole } from "@/types/admin";
 import { mockAlerts } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -69,80 +75,231 @@ interface NavItem {
   badgeVariant?: "default" | "destructive" | "secondary" | "outline";
 }
 
+/** Navigation group definition */
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+/** Role-specific navigation menus */
+const ROLE_NAV_GROUPS: Record<string, NavGroup[]> = {
+  [UserRole.SUPER_ADMIN]: [
+    {
+      label: "Main",
+      items: [
+        { id: AdminSection.OVERVIEW, label: "Overview", icon: LayoutDashboard },
+      ],
+    },
+    {
+      label: "User Management",
+      items: [
+        { id: AdminSection.RIDERS, label: "Riders", icon: Bike },
+        { id: AdminSection.FLEET_MANAGERS, label: "Fleet Managers", icon: UserCog },
+        { id: AdminSection.FLEET_OWNERS, label: "Fleet Owners", icon: Crown },
+      ],
+    },
+    {
+      label: "Operations",
+      items: [
+        { id: AdminSection.FINANCIALS, label: "Financials", icon: Wallet },
+        { id: AdminSection.TRANSACTIONS, label: "Transactions", icon: ArrowLeftRight },
+        { id: AdminSection.EXPENSES, label: "Expenses", icon: Receipt },
+        { id: AdminSection.FLEET, label: "Fleet & Assets", icon: Bike },
+      ],
+    },
+    {
+      label: "Governance",
+      items: [
+        {
+          id: AdminSection.RISK,
+          label: "Risk & Compliance",
+          icon: ShieldAlert,
+          badgeCount: mockAlerts.filter((a) => !a.isAcknowledged).length,
+          badgeVariant: "destructive" as const,
+        },
+        { id: AdminSection.AUDIT, label: "Audit Logs", icon: FileText },
+      ],
+    },
+    {
+      label: "System",
+      items: [
+        { id: AdminSection.SETTINGS, label: "Settings", icon: Settings },
+      ],
+    },
+  ],
+
+  [UserRole.FLEET_MANAGER]: [
+    {
+      label: "Main",
+      items: [
+        { id: AdminSection.OVERVIEW, label: "Overview", icon: LayoutDashboard },
+      ],
+    },
+    {
+      label: "Fleet",
+      items: [
+        { id: AdminSection.RIDERS, label: "My Riders", icon: Bike },
+        { id: AdminSection.FLEET, label: "Fleet & Assets", icon: Bike },
+      ],
+    },
+    {
+      label: "Finance",
+      items: [
+        { id: AdminSection.FINANCIALS, label: "Financial Overview", icon: Wallet },
+      ],
+    },
+    {
+      label: "Governance",
+      items: [
+        { id: AdminSection.RISK, label: "Risk & Compliance", icon: ShieldAlert },
+      ],
+    },
+    {
+      label: "System",
+      items: [
+        { id: AdminSection.SETTINGS, label: "Settings", icon: Settings },
+      ],
+    },
+  ],
+
+  [UserRole.FLEET_OWNER]: [
+    {
+      label: "Main",
+      items: [
+        { id: AdminSection.OVERVIEW, label: "Overview", icon: LayoutDashboard },
+      ],
+    },
+    {
+      label: "Fleet",
+      items: [
+        { id: AdminSection.FLEET, label: "My Fleet", icon: Bike },
+      ],
+    },
+    {
+      label: "Finance",
+      items: [
+        { id: AdminSection.FINANCIALS, label: "Financial/Payouts", icon: Wallet },
+      ],
+    },
+    {
+      label: "System",
+      items: [
+        { id: AdminSection.SETTINGS, label: "Settings", icon: Settings },
+      ],
+    },
+  ],
+
+  [UserRole.RIDER]: [
+    {
+      label: "Main",
+      items: [
+        { id: AdminSection.OVERVIEW, label: "Overview", icon: LayoutDashboard },
+      ],
+    },
+    {
+      label: "Finance",
+      items: [
+        { id: AdminSection.FINANCIALS, label: "My Payments", icon: CreditCard },
+      ],
+    },
+    {
+      label: "Assets",
+      items: [
+        { id: AdminSection.FLEET, label: "My Bike", icon: Bike },
+      ],
+    },
+    {
+      label: "System",
+      items: [
+        { id: AdminSection.SETTINGS, label: "Settings", icon: Settings },
+      ],
+    },
+  ],
+
+  // ADMIN role gets same as SUPER_ADMIN
+  [UserRole.ADMIN]: [
+    {
+      label: "Main",
+      items: [
+        { id: AdminSection.OVERVIEW, label: "Overview", icon: LayoutDashboard },
+      ],
+    },
+    {
+      label: "User Management",
+      items: [
+        { id: AdminSection.RIDERS, label: "Riders", icon: Bike },
+        { id: AdminSection.FLEET_MANAGERS, label: "Fleet Managers", icon: UserCog },
+        { id: AdminSection.FLEET_OWNERS, label: "Fleet Owners", icon: Crown },
+      ],
+    },
+    {
+      label: "Operations",
+      items: [
+        { id: AdminSection.FINANCIALS, label: "Financials", icon: Wallet },
+        { id: AdminSection.TRANSACTIONS, label: "Transactions", icon: ArrowLeftRight },
+        { id: AdminSection.EXPENSES, label: "Expenses", icon: Receipt },
+        { id: AdminSection.FLEET, label: "Fleet & Assets", icon: Bike },
+      ],
+    },
+    {
+      label: "Governance",
+      items: [
+        {
+          id: AdminSection.RISK,
+          label: "Risk & Compliance",
+          icon: ShieldAlert,
+          badgeCount: mockAlerts.filter((a) => !a.isAcknowledged).length,
+          badgeVariant: "destructive" as const,
+        },
+        { id: AdminSection.AUDIT, label: "Audit Logs", icon: FileText },
+      ],
+    },
+    {
+      label: "System",
+      items: [
+        { id: AdminSection.SETTINGS, label: "Settings", icon: Settings },
+      ],
+    },
+  ],
+};
+
+/** Role display names for sidebar branding */
+const ROLE_DISPLAY_NAMES: Record<string, string> = {
+  [UserRole.SUPER_ADMIN]: "Superadmin",
+  [UserRole.ADMIN]: "Admin",
+  [UserRole.FLEET_MANAGER]: "Fleet Manager",
+  [UserRole.FLEET_OWNER]: "Fleet Owner",
+  [UserRole.RIDER]: "Rider",
+  [UserRole.COMPLIANCE_OFFICER]: "Compliance Officer",
+};
+
 /**
- * Navigation items organized into logical groups.
- * Order here determines the display order in the sidebar.
+ * Returns navigation groups appropriate for the given user role.
+ * Falls back to SUPER_ADMIN menu for unknown roles.
  */
-const navGroups: { label: string; items: NavItem[] }[] = [
-  {
-    label: "Main",
-    items: [
-      { id: AdminSection.OVERVIEW, label: "Overview", icon: LayoutDashboard },
-    ],
-  },
-  {
-    label: "User Management",
-    items: [
-      { id: AdminSection.RIDERS, label: "Riders", icon: Bike },
-      { id: AdminSection.FLEET_MANAGERS, label: "Fleet Managers", icon: UserCog },
-      { id: AdminSection.FLEET_OWNERS, label: "Fleet Owners", icon: Crown },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      {
-        id: AdminSection.FINANCIALS,
-        label: "Financials",
-        icon: Wallet,
-      },
-      {
-        id: AdminSection.TRANSACTIONS,
-        label: "Transactions",
-        icon: ArrowLeftRight,
-      },
-      {
-        id: AdminSection.EXPENSES,
-        label: "Expenses",
-        icon: Receipt,
-      },
-      {
-        id: AdminSection.FLEET,
-        label: "Fleet & Assets",
-        icon: Bike,
-      },
-    ],
-  },
-  {
-    label: "Governance",
-    items: [
-      {
-        id: AdminSection.RISK,
-        label: "Risk & Compliance",
-        icon: ShieldAlert,
-        badgeCount: mockAlerts.filter((a) => !a.isAcknowledged).length,
-        badgeVariant: "destructive" as const,
-      },
-      {
-        id: AdminSection.AUDIT,
-        label: "Audit Logs",
-        icon: FileText,
-      },
-    ],
-  },
-  {
-    label: "System",
-    items: [
-      { id: AdminSection.SETTINGS, label: "Settings", icon: Settings },
-    ],
-  },
-];
+function getNavItemsForRole(role: string): NavGroup[] {
+  // Add PROFILE section to all roles
+  const navGroups = ROLE_NAV_GROUPS[role] || ROLE_NAV_GROUPS[UserRole.SUPER_ADMIN];
+
+  // Append Profile section to every role's nav
+  return [
+    ...navGroups,
+    {
+      label: "Account",
+      items: [
+        { id: AdminSection.PROFILE, label: "Profile", icon: UserCircle },
+      ],
+    },
+  ];
+}
 
 // ============================================================================
 // SIDEBAR COMPONENT
 // ============================================================================
 
 export function AdminSidebar() {
+  const { data: session } = useSession();
+  const router = useRouter();
   const {
     activeSection,
     sidebarCollapsed,
@@ -152,6 +309,11 @@ export function AdminSidebar() {
     setMobileSidebarOpen,
     unreadCount,
   } = useAdminStore();
+
+  const userRole = session?.user?.role || UserRole.SUPER_ADMIN;
+  const roleDisplayName = ROLE_DISPLAY_NAMES[userRole] || "Admin";
+
+  const navGroups = useMemo(() => getNavItemsForRole(userRole), [userRole]);
 
   /**
    * Renders a single navigation item with proper styling, tooltips,
@@ -246,6 +408,12 @@ export function AdminSidebar() {
     );
   };
 
+  /** Handle sign out with redirect fix for Caddy reverse proxy */
+  const handleSignOut = async () => {
+    await signOut({ redirect: false });
+    router.push("/");
+  };
+
   /** Sidebar content shared between desktop and mobile views */
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -271,7 +439,7 @@ export function AdminSidebar() {
                 Kowa Ride
               </h1>
               <p className="whitespace-nowrap text-[10px] font-medium uppercase tracking-widest text-emerald-400/80">
-                Superadmin
+                {roleDisplayName}
               </p>
             </motion.div>
           )}
@@ -339,6 +507,20 @@ export function AdminSidebar() {
           )}
         </button>
 
+        {/* Profile Quick Access */}
+        <button
+          onClick={() => setActiveSection(AdminSection.PROFILE)}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+            "text-slate-400 hover:bg-white/10 hover:text-white"
+          )}
+        >
+          <UserCircle className="h-5 w-5" />
+          {(!sidebarCollapsed || mobileSidebarOpen) && (
+            <span className="truncate">Profile</span>
+          )}
+        </button>
+
         {/* Collapse Toggle (desktop only) */}
         <button
           onClick={toggleSidebar}
@@ -359,6 +541,7 @@ export function AdminSidebar() {
 
         {/* Logout */}
         <button
+          onClick={handleSignOut}
           className={cn(
             "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
             "text-slate-500 hover:bg-red-500/10 hover:text-red-400"

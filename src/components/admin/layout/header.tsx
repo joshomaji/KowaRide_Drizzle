@@ -14,6 +14,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Menu,
   Search,
@@ -98,6 +99,10 @@ const sectionMeta: Record<string, { title: string; description: string }> = {
     title: "System Settings",
     description: "Platform configuration, rule engine, and system parameters",
   },
+  PROFILE: {
+    title: "My Profile",
+    description: "Manage your personal information and security settings",
+  },
 };
 
 // ============================================================================
@@ -124,6 +129,7 @@ const severityDots: Record<AlertSeverity, string> = {
 
 export function AdminHeader() {
   const { data: session } = useSession();
+  const router = useRouter();
   const {
     activeSection,
     mobileSidebarOpen,
@@ -337,7 +343,7 @@ export function AdminHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => useAdminStore.getState().setActiveSection(AdminSection.PROFILE)}>
                 <User className="mr-2 h-4 w-4" />
                 Profile Settings
               </DropdownMenuItem>
@@ -348,7 +354,10 @@ export function AdminHeader() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-red-600 focus:text-red-600"
-                onClick={() => signOut({ callbackUrl: "/" })}
+                onClick={async () => {
+                  await signOut({ redirect: false });
+                  router.push("/");
+                }}
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign Out

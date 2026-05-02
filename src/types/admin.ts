@@ -138,6 +138,7 @@ export enum AdminSection {
   AUDIT = "AUDIT",
   EXPENSES = "EXPENSES",
   SETTINGS = "SETTINGS",
+  PROFILE = "PROFILE",
 }
 
 // ============================================================================

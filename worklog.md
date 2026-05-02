@@ -96,3 +96,57 @@ Stage Summary:
 - Root cause was stale DATABASE_URL in system env + postgres.js incompatibility with Turbopack
 - Switched to node-postgres (pg) driver — more stable in Next.js runtime
 - Admin login: admin@kowaride.com / KowaR1d3@2024!
+
+---
+Task ID: 4
+Agent: full-stack-developer
+Task: Implement 3 dashboard features (sidebar nav, logout fix, profile update)
+
+Work Log:
+- Added PROFILE = "PROFILE" to AdminSection enum in src/types/admin.ts
+- Refactored sidebar (src/components/admin/layout/sidebar.tsx):
+  - Added useSession() from next-auth/react for role detection
+  - Created getNavItemsForRole(role) function with role-specific nav groups
+  - SUPER_ADMIN: all current items (Overview, Riders, FM, FO, Financials, Transactions, Expenses, Fleet, Risk, Audit, Settings)
+  - FLEET_MANAGER: Overview, My Riders, Fleet & Assets, Financial Overview, Risk & Compliance, Settings
+  - FLEET_OWNER: Overview, My Fleet, Financial/Payouts, Settings
+  - RIDER: Overview, My Payments, My Bike, Settings
+  - ADMIN: same as SUPER_ADMIN
+  - Added PROFILE section to all roles via "Account" nav group with UserCircle icon
+  - Updated brand text to show role name (e.g., "Fleet Manager" instead of "Superadmin")
+  - Added UserCircle profile quick-access button in sidebar footer
+  - Fixed signOut: added onClick handler with signOut({ redirect: false }) + router.push("/")
+- Fixed logout redirect in header (src/components/admin/layout/header.tsx):
+  - Replaced signOut({ callbackUrl: "/" }) with signOut({ redirect: false }) + router.push("/")
+  - Added useRouter import from next/navigation
+  - Added PROFILE to sectionMeta map
+  - Updated "Profile Settings" dropdown item to navigate to AdminSection.PROFILE
+- Created API route src/app/api/auth/profile/route.ts:
+  - GET: Returns current user profile from session + DB (excludes passwordHash)
+  - PUT: Updates firstName, lastName, phone, avatarUrl in users table
+  - Validates session via getServerSession(authOptions)
+  - Uses initDb() and drizzle ORM queries
+- Created API route src/app/api/auth/change-password/route.ts:
+  - POST: Validates currentPassword with bcryptjs compare(), hashes newPassword with hash()
+  - Validates newPassword === confirmPassword, min 8 chars
+  - Updates passwordHash in users table
+- Created profile page component src/components/admin/settings/profile-page.tsx:
+  - Two cards: "Profile Information" and "Change Password"
+  - Profile card: firstName, lastName, phone, avatarUrl (editable), email (read-only)
+  - Password card: current/new/confirm password with show/hide toggles
+  - Password strength indicator (Weak/Fair/Good/Strong)
+  - Real-time validation feedback
+  - Save buttons with loading states
+  - Success/error toast-like notifications
+  - User summary banner with avatar, name, role badge, KYC status badge
+  - Responsive two-column layout (stacks on mobile)
+  - Dark theme compatible
+- Updated src/app/page.tsx section renderer map to include AdminSection.PROFILE → ProfilePage
+- Lint passes clean, dev server stable
+
+Stage Summary:
+- Role-based sidebar navigation fully implemented (4 role configurations)
+- Logout redirect fixed in both sidebar and header (signOut + router.push)
+- Profile & Password update page created with full backend API
+- API routes: GET/PUT /api/auth/profile, POST /api/auth/change-password
+- All changes lint-clean and server-stable
