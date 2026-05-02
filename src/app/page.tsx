@@ -1,17 +1,18 @@
 /**
  * ============================================================================
- * KOWA RIDE - SUPERADMIN DASHBOARD
- * Main Entry Point (Single Page Application with Auth)
+ * KOWA RIDE - MAIN ENTRY POINT
+ * Role-Based Dashboard with Auth
  * ============================================================================
  *
- * This is the root page of the Superadmin dashboard. It checks authentication
- * status and shows either the Login page or the Dashboard.
+ * Root page that checks authentication and renders the appropriate
+ * role-specific dashboard. Each role (Super Admin, Fleet Manager,
+ * Fleet Owner, Rider) gets its own unique dashboard experience.
  *
- * Navigation is handled entirely client-side via the AdminSection enum
- * stored in the admin Zustand store.
+ * Navigation is handled client-side via the AdminSection enum
+ * stored in the Zustand admin store.
  *
  * @module app/page
- * @version 2.0.0 (with authentication)
+ * @version 3.0.0 (role-based dashboards)
  * ============================================================================
  */
 
@@ -20,12 +21,12 @@
 import { useSession } from "next-auth/react";
 import { AdminLayout } from "@/components/admin/layout/admin-layout";
 import { useAdminStore } from "@/store/admin-store";
-import { AdminSection } from "@/types/admin";
+import { AdminSection, UserRole } from "@/types/admin";
 import LoginPage from "@/components/auth/login-page";
 import { Loader2 } from "lucide-react";
 
 // ============================================================================
-// SECTION COMPONENTS
+// SHARED SECTION COMPONENTS
 // ============================================================================
 
 import { DashboardOverview } from "@/components/admin/dashboard/overview";
@@ -42,11 +43,31 @@ import { SettingsPage } from "@/components/admin/settings/settings-page";
 import { ProfilePage } from "@/components/admin/settings/profile-page";
 
 // ============================================================================
-// SECTION RENDERER MAP
+// ROLE-SPECIFIC DASHBOARD OVERVIEWS
+// ============================================================================
+
+import { FleetManagerOverview } from "@/components/fleet-manager/dashboard/overview";
+import { FleetOwnerOverview } from "@/components/fleet-owner/dashboard/overview";
+import { RiderOverview } from "@/components/rider/dashboard/overview";
+
+// ============================================================================
+// ROLE-SPECIFIC OVERVIEW MAP (defined at module level, not during render)
+// ============================================================================
+
+const roleOverviewMap: Record<string, React.ComponentType> = {
+  [UserRole.SUPER_ADMIN]: DashboardOverview,
+  [UserRole.ADMIN]: DashboardOverview,
+  [UserRole.FLEET_MANAGER]: FleetManagerOverview,
+  [UserRole.FLEET_OWNER]: FleetOwnerOverview,
+  [UserRole.RIDER]: RiderOverview,
+};
+
+// ============================================================================
+// SHARED SECTION COMPONENTS MAP
 // ============================================================================
 
 const sectionComponents: Record<AdminSection, React.ComponentType> = {
-  [AdminSection.OVERVIEW]: DashboardOverview,
+  [AdminSection.OVERVIEW]: DashboardOverview, // fallback, overridden by role
   [AdminSection.RIDERS]: RidersPage,
   [AdminSection.FLEET_MANAGERS]: FleetManagersPage,
   [AdminSection.FLEET_OWNERS]: FleetOwnersPage,
@@ -60,6 +81,23 @@ const sectionComponents: Record<AdminSection, React.ComponentType> = {
   [AdminSection.SETTINGS]: SettingsPage,
   [AdminSection.PROFILE]: ProfilePage,
 };
+
+// ============================================================================
+// SECTION RENDERER COMPONENT
+// ============================================================================
+
+/** Renders the correct section based on active section and user role */
+function SectionRenderer({ activeSection, userRole }: { activeSection: AdminSection; userRole: string }) {
+  // For OVERVIEW, use the role-specific dashboard
+  if (activeSection === AdminSection.OVERVIEW) {
+    const RoleOverview = roleOverviewMap[userRole] || DashboardOverview;
+    return <RoleOverview />;
+  }
+
+  // For other sections, use the shared section component
+  const SectionComponent = sectionComponents[activeSection] || DashboardOverview;
+  return <SectionComponent />;
+}
 
 // ============================================================================
 // MAIN PAGE COMPONENT
@@ -86,13 +124,12 @@ export default function HomePage() {
     return <LoginPage />;
   }
 
-  // Show dashboard for authenticated users
-  const ActiveSectionComponent = sectionComponents[activeSection] || DashboardOverview;
+  const userRole = session?.user?.role || UserRole.SUPER_ADMIN;
 
   return (
     <AdminLayout>
-      <div key={activeSection} className="p-4 md:p-6">
-        <ActiveSectionComponent />
+      <div key={activeSection} className="p-0 md:p-0">
+        <SectionRenderer activeSection={activeSection} userRole={userRole} />
       </div>
     </AdminLayout>
   );

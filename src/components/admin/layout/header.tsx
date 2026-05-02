@@ -14,7 +14,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Menu,
   Search,
@@ -50,7 +49,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertSeverity, AdminSection } from "@/types/admin";
+import { AlertSeverity, AdminSection, UserRole } from "@/types/admin";
 import { format } from "date-fns";
 
 // ============================================================================
@@ -105,6 +104,30 @@ const sectionMeta: Record<string, { title: string; description: string }> = {
   },
 };
 
+/** Role-specific OVERVIEW titles and descriptions */
+const roleOverviewMeta: Record<string, { title: string; description: string }> = {
+  [UserRole.SUPER_ADMIN]: {
+    title: "Dashboard Overview",
+    description: "Platform-wide metrics and key performance indicators",
+  },
+  [UserRole.ADMIN]: {
+    title: "Dashboard Overview",
+    description: "Platform-wide metrics and key performance indicators",
+  },
+  [UserRole.FLEET_MANAGER]: {
+    title: "Fleet Manager Dashboard",
+    description: "Monitor your riders, bikes, and collection performance",
+  },
+  [UserRole.FLEET_OWNER]: {
+    title: "Fleet Owner Dashboard",
+    description: "Track your fleet performance, ROI, and payouts",
+  },
+  [UserRole.RIDER]: {
+    title: "Rider Dashboard",
+    description: "Track your payments, bike status, and ownership journey",
+  },
+};
+
 // ============================================================================
 // SEVERITY STYLING MAP
 // ============================================================================
@@ -129,7 +152,6 @@ const severityDots: Record<AlertSeverity, string> = {
 
 export function AdminHeader() {
   const { data: session } = useSession();
-  const router = useRouter();
   const {
     activeSection,
     mobileSidebarOpen,
@@ -144,7 +166,11 @@ export function AdminHeader() {
   const { theme, setTheme } = useTheme();
   const isDark = theme === "dark";
 
-  const meta = sectionMeta[activeSection] || sectionMeta.OVERVIEW;
+  const userRole = session?.user?.role || UserRole.SUPER_ADMIN;
+
+  const meta = activeSection === AdminSection.OVERVIEW
+    ? roleOverviewMeta[userRole] || sectionMeta.OVERVIEW
+    : sectionMeta[activeSection] || sectionMeta.OVERVIEW;
   const unacknowledgedAlerts = mockAlerts.filter((a) => !a.isAcknowledged);
 
   return (
@@ -356,7 +382,8 @@ export function AdminHeader() {
                 className="text-red-600 focus:text-red-600"
                 onClick={async () => {
                   await signOut({ redirect: false });
-                  router.push("/");
+                  // Use window.location for a hard redirect that respects the current origin
+                  window.location.href = "/";
                 }}
               >
                 <LogOut className="mr-2 h-4 w-4" />

@@ -1,29 +1,27 @@
-"use client";
-
 /**
  * ============================================================================
- * KOWA RIDE - SUPERADMIN DASHBOARD
+ * KOWA RIDE - ROLE-BASED MOBILE FOOTER
  * Mobile Bottom Navigation Bar
  * ============================================================================
  *
  * Fixed bottom navigation bar visible only on mobile screens (below lg breakpoint).
- * Provides quick access to the 4 most-used sections plus a "More" menu that
- * opens the full sidebar navigation drawer.
+ * Shows role-specific quick access items plus a "More" menu that opens the
+ * full sidebar navigation drawer.
  *
- * Items:
- * - Dashboard → AdminSection.OVERVIEW
- * - Riders → AdminSection.RIDERS
- * - Payments → AdminSection.FINANCIALS
- * - Bikes → AdminSection.FLEET
- * - More → Opens mobile sidebar overlay
- *
- * The active item is highlighted with an emerald accent. Each item shows an
- * icon and a label. A subtle haptic-style scale animation is applied on tap.
+ * Each role sees different quick access items:
+ * - SUPER_ADMIN/ADMIN: Dashboard, Riders, Payments, Bikes, More
+ * - FLEET_MANAGER: Dashboard, My Riders, Payments, Bikes, More
+ * - FLEET_OWNER: Dashboard, My Fleet, Payouts, More
+ * - RIDER: Dashboard, My Payments, My Bike, More
  *
  * @module components/admin/layout/mobile-footer
+ * @version 2.0.0 (role-based navigation)
  * ============================================================================
  */
 
+"use client";
+
+import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard,
@@ -31,13 +29,16 @@ import {
   Wallet,
   MoreHorizontal,
   Gauge,
+  CreditCard,
+  Users,
+  Crown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminStore } from "@/store/admin-store";
-import { AdminSection } from "@/types/admin";
+import { AdminSection, UserRole } from "@/types/admin";
 
 // ============================================================================
-// NAVIGATION ITEMS
+// NAVIGATION ITEMS PER ROLE
 // ============================================================================
 
 interface MobileNavItem {
@@ -46,36 +47,48 @@ interface MobileNavItem {
   icon: React.ElementType;
 }
 
-const mobileNavItems: MobileNavItem[] = [
-  {
-    id: AdminSection.OVERVIEW,
-    label: "Dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    id: AdminSection.RIDERS,
-    label: "Riders",
-    icon: Bike,
-  },
-  {
-    id: AdminSection.FINANCIALS,
-    label: "Payments",
-    icon: Wallet,
-  },
-  {
-    id: AdminSection.FLEET,
-    label: "Bikes",
-    icon: Gauge,
-  },
-];
+const ROLE_MOBILE_NAV: Record<string, MobileNavItem[]> = {
+  [UserRole.SUPER_ADMIN]: [
+    { id: AdminSection.OVERVIEW, label: "Dashboard", icon: LayoutDashboard },
+    { id: AdminSection.RIDERS, label: "Riders", icon: Bike },
+    { id: AdminSection.FINANCIALS, label: "Payments", icon: Wallet },
+    { id: AdminSection.FLEET, label: "Bikes", icon: Gauge },
+  ],
+  [UserRole.ADMIN]: [
+    { id: AdminSection.OVERVIEW, label: "Dashboard", icon: LayoutDashboard },
+    { id: AdminSection.RIDERS, label: "Riders", icon: Bike },
+    { id: AdminSection.FINANCIALS, label: "Payments", icon: Wallet },
+    { id: AdminSection.FLEET, label: "Bikes", icon: Gauge },
+  ],
+  [UserRole.FLEET_MANAGER]: [
+    { id: AdminSection.OVERVIEW, label: "Dashboard", icon: LayoutDashboard },
+    { id: AdminSection.RIDERS, label: "My Riders", icon: Users },
+    { id: AdminSection.FINANCIALS, label: "Payments", icon: Wallet },
+    { id: AdminSection.FLEET, label: "Bikes", icon: Gauge },
+  ],
+  [UserRole.FLEET_OWNER]: [
+    { id: AdminSection.OVERVIEW, label: "Dashboard", icon: LayoutDashboard },
+    { id: AdminSection.FLEET, label: "My Fleet", icon: Bike },
+    { id: AdminSection.FINANCIALS, label: "Payouts", icon: Crown },
+  ],
+  [UserRole.RIDER]: [
+    { id: AdminSection.OVERVIEW, label: "Dashboard", icon: LayoutDashboard },
+    { id: AdminSection.FINANCIALS, label: "Payments", icon: CreditCard },
+    { id: AdminSection.FLEET, label: "My Bike", icon: Bike },
+  ],
+};
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
 export function MobileFooter() {
+  const { data: session } = useSession();
   const { activeSection, setActiveSection, setMobileSidebarOpen } =
     useAdminStore();
+
+  const userRole = session?.user?.role || UserRole.SUPER_ADMIN;
+  const mobileNavItems = ROLE_MOBILE_NAV[userRole] || ROLE_MOBILE_NAV[UserRole.SUPER_ADMIN];
 
   return (
     <nav

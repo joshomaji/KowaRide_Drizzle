@@ -24,7 +24,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -299,7 +298,6 @@ function getNavItemsForRole(role: string): NavGroup[] {
 
 export function AdminSidebar() {
   const { data: session } = useSession();
-  const router = useRouter();
   const {
     activeSection,
     sidebarCollapsed,
@@ -411,7 +409,9 @@ export function AdminSidebar() {
   /** Handle sign out with redirect fix for Caddy reverse proxy */
   const handleSignOut = async () => {
     await signOut({ redirect: false });
-    router.push("/");
+    // Use window.location for a hard redirect that respects the current origin
+    // (router.push "/" may resolve to localhost:3000 behind Caddy reverse proxy)
+    window.location.href = "/";
   };
 
   /** Sidebar content shared between desktop and mobile views */
